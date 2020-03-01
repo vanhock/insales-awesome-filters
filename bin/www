@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-
+require("@google-cloud/debug-agent").start();
 /**
  * Module dependencies.
  */
@@ -8,6 +8,7 @@ const app = require('../app');
 const {mongoClient, objectId} = require('../db');
 const debug = require('debug')('awesome-filters:server');
 const http = require('http');
+//const fs = require("fs");
 let dbClient;
 
 /**

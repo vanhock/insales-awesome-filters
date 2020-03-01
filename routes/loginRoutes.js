@@ -23,17 +23,22 @@ module.exports = function(app) {
     function login() {
       const authVerifyToken = crypto.randomBytes(20).toString("hex");
       app.locals.collection
-        .insertOne({
-          shop: shop,
-          user_id: user_id,
-          auth_verify_token: authVerifyToken
-        })
+        .findOneAndUpdate(
+          {
+            shop: shop
+          },
+          {
+            $set: {
+              user_id: user_id,
+              auth_verify_token: authVerifyToken
+            }
+          }
+        )
         .then(() => {
-          return res.redirect(
-            `https://${shop}/admin/application/${
-              process.env.APP_ID
-            }/login?token=${authVerifyToken}&login=${appHost}/autologin`
-          );
+          const urlForRedirect = `https://${shop}/admin/applications/${
+            process.env.APP_ID
+          }/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
+          return res.redirect(urlForRedirect);
         });
     }
   });
@@ -49,22 +54,31 @@ module.exports = function(app) {
     if (!token3) {
       return res.status(500).send("Have no required params!");
     }
-    app.locals.collection.findOneAndDelete({ user_id: user_id }).then(user => {
+    app.locals.collection.findOne({ user_id: user_id }).then(user => {
+      if (!user) {
+        return res
+          .status(400)
+          .send("Ошибка авторизации, переустановите приложение");
+      }
       const isAuthValid =
         crypto
           .createHash("md5")
           .update(
-            user.value.auth_verify_token +
+            user.auth_verify_token +
               user_email +
               user_name +
               user_id +
-              email_confirmed
+              email_confirmed +
+              user.password
           )
           .digest("hex") === token3;
       if (isAuthValid) {
         const af_token = crypto.randomBytes(20).toString("hex");
         app.locals.collection
-          .findOneAndUpdate({ shop: user.value.shop }, { af_token: af_token })
+          .findOneAndUpdate(
+            { user_id: user_id },
+            { $set: { af_token: af_token } }
+          )
           .then(() => {
             res.cookie("af_token", af_token, {
               maxAge: 900000,
