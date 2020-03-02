@@ -91,26 +91,4 @@ module.exports = function(app) {
       }
     });
   });
-
-  app.get("/check-auth", (req, res) => {
-    const af_token = req.cookies["af_token"];
-    checkAuth(app, af_token)
-      .then(account => {
-        if (af_token === account.af_token) {
-          return res.status(200);
-        }
-        return res
-          .status(401)
-          .send(
-            "Авторизуйтесь в бек-офисе вашего сайта для входа в приложение"
-          );
-      })
-      .catch(() => {
-        return res
-          .status(401)
-          .send(
-            "Авторизуйтесь в бек-офисе вашего сайта для входа в приложение"
-          );
-      });
-  });
 };

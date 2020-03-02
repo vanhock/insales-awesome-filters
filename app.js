@@ -1,3 +1,4 @@
+global.__basedir = __dirname;
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
@@ -17,7 +18,5 @@ app.use(
     sourceMap: true
   })
 );
-app.use(express.static(path.join(__dirname, "public")));
-
 require("./routes")(app);
 module.exports = app;

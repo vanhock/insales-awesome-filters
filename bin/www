@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-require("@google-cloud/debug-agent").start();
+//require("@google-cloud/debug-agent").start();
 /**
  * Module dependencies.
  */
