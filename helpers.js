@@ -26,23 +26,22 @@ const checkAuth = function(app, token) {
   });
 };
 
-const inSalesApi = async function(
-  password,
-  shop,
-  url,
-  data = {},
-  method = "GET"
-) {
-  try {
-    return await axios.request({
-      method: method,
-      url: `http://${process.env.APP_ID}:${password}@${shop}/admin/${url}.json`,
-      responseType: "json",
-      data: data
-    });
-  } catch (e) {
-    throw new Error(e);
-  }
+const throttle = function(func, wait = 100) {
+  let timer = null;
+  return function(...args) {
+    if (timer === null) {
+      timer = setTimeout(() => {
+        func.apply(this, args);
+        timer = null;
+      }, wait);
+    }
+  };
 };
 
-module.exports = { getPassword, checkAuth, inSalesApi };
+const insales = require("insales");
+const inSalesApi = insales({
+  id: process.env.APP_ID,
+  secret: process.env.APP_SECRET
+});
+
+module.exports = { getPassword, checkAuth, inSalesApi, throttle };
