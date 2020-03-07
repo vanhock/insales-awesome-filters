@@ -50,7 +50,8 @@ module.exports = function(app) {
 
   app.post("/uninstall-from-theme", withAuth, async (req, res) => {
     const themeId = req.query["themeId"];
-    let installedAssets = await getInstalledAssets(req, res);
+    const assetsList = await getThemeAssets(req, res);
+    let installedAssets = getInstalledAssets(assetsList);
     let removedAssets = 0;
     if (installedAssets.length) {
       installedAssets.forEach(id => {
@@ -100,22 +101,30 @@ module.exports = function(app) {
       (!!res.user["installedThemeVersion"] &&
         res.user["installedThemeVersion"][themeId]) ||
       0;
-    let installedAssets = await getInstalledAssets(req, res);
+    const assetsList = await getThemeAssets(req, res);
+    let installedAssets = getInstalledAssets(assetsList);
     if (
       cdn.data.version === thisInstalledThemeVersion &&
       installedAssets.length === assets.length
     ) {
       return res.status(400).send("Установлена последняя версия");
     }
-    removeInstalledAssets(req, res, installedAssets, () => {
-      uploadAssets()
-    });
-    const result = {
-      report: {},
-      success: false
-    };
-    const success = [];
+    if (!installedAssets.length) {
+      /*backupTheme(assetsList, themeId, () => {
+        uploadAssets();
+      });*/
+    } else {
+      removeInstalledAssets(req, res, installedAssets, () => {
+        uploadAssets();
+      });
+    }
+
     function uploadAssets() {
+      const result = {
+        report: {},
+        success: false
+      };
+      const success = [];
       assets.forEach(asset => {
         setTimeout(() => {
           inSalesApi
@@ -169,6 +178,17 @@ module.exports = function(app) {
       });
     }
   });
+
+  app.get("/backup-theme", withAuth, async (req, res) => {
+    /**
+     * Backup theme if app not installed yet
+     */
+    const { themeId } = req.query;
+    const assets = await getThemeAssets(req, res);
+    backupTheme(req, res, assets, themeId, data => {
+      res.status(200).send(data);
+    });
+  });
 };
 
 function getErrors(response) {
@@ -182,22 +202,10 @@ function getErrors(response) {
   return errors;
 }
 
-async function getInstalledAssets(req, res) {
-  try {
-    const { data } = await inSalesApi.listAsset({
-      token: res.user.password,
-      url: res.user.shop,
-      theme: req.query["themeId"]
-    });
-    return await data
-      .filter(({ inner_file_name }) => inner_file_name.includes("af_"))
-      .map(({ id }) => id);
-  } catch ({ response }) {
-    if (response.statusCode !== 422) {
-      return res.status(500);
-    }
-    res.status(400).send(getErrors(response));
-  }
+function getInstalledAssets(assets) {
+  return assets
+    .filter(({ inner_file_name }) => inner_file_name.includes("af_"))
+    .map(({ id }) => id);
 }
 
 function removeInstalledAssets(req, res, installedAssets, cb) {
@@ -222,5 +230,104 @@ function removeInstalledAssets(req, res, installedAssets, cb) {
     });
   } else {
     cb();
+  }
+}
+
+function backupTheme(req, res, assets, themeId, cb) {
+  const fs = require("fs");
+  const shell = require("shelljs");
+  const AdmZip = require("adm-zip");
+  const zip = new AdmZip();
+  const assetsBaseUrl = "https://assets.insales.ru";
+  const tempFolder = path.join(__basedir, "/temp");
+  const targetPath = `${tempFolder}/${themeId}`;
+  const folders = {
+    configuration: "config",
+    media: "media",
+    snippet: "snippets",
+    template: "templates"
+  };
+  const backup = [];
+  assets.forEach(async (asset, index) => {
+    const typeFolder = folders[asset.type.replace("Asset::", "").toLowerCase()];
+    /*
+    shell.mkdir("-p", `${targetPath}/${typeFolder}`);
+    //shell.rm("-rf", folderPath)
+    const file = fs.createWriteStream(
+      `${targetPath}/${typeFolder}/${asset["human_readable_name"]}`
+    );*/
+    const url = `${assetsBaseUrl}${asset["asset_url"]}`;
+    try {
+      const urlResponse = await axios.get(url);
+      const { data } = urlResponse;
+      const size =
+        Array.isArray(data) || typeof data === "string"
+          ? data.length
+          : typeof data === "object"
+            ? Object.keys(data).length
+            : 0;
+      try {
+        backup.push(asset);
+        zip.addFile(
+          `${typeFolder}/${asset["human_readable_name"]}`,
+          Buffer.alloc(size, data)
+        );
+      } catch (e) {
+        console.log(e);
+      }
+      //response.pipe(file);
+      if (backup.length === assets.length) {
+        return cb(zip.toBuffer());
+      }
+    } catch (e) {
+      setTimeout(async () => {
+        const data = await getThemeAsset(req, res, asset.id);
+        if (data) {
+          zip.addFile(
+            `${typeFolder}/${asset["human_readable_name"]}`,
+            data.content
+          );
+          backup.push(asset);
+          if (backup.length === assets.length) {
+            try {
+              const fileToSend = await zip.toBuffer();
+              return cb(fileToSend);
+            }catch (e) {
+              console.log(e)
+            }
+          }
+        }
+      }, 1000);
+    }
+  });
+}
+
+async function getThemeAsset(req, res, assetId) {
+  try {
+    const { data } = await inSalesApi.getAsset({
+      token: res.user.password,
+      url: res.user.shop,
+      theme: req.query["themeId"],
+      assetId: assetId
+    });
+    return data;
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+async function getThemeAssets(req, res) {
+  try {
+    const { data } = await inSalesApi.listAsset({
+      token: res.user.password,
+      url: res.user.shop,
+      theme: req.query["themeId"]
+    });
+    return data;
+  } catch ({ response }) {
+    if (response.statusCode !== 422) {
+      return res.status(500);
+    }
+    res.status(400).send(getErrors(response));
   }
 }
