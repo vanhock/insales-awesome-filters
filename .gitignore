@@ -4,6 +4,7 @@ node_modules
 /security
 /admin
 /app
+/temp
 .env
 !.env.example
 

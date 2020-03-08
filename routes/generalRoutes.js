@@ -234,13 +234,9 @@ function removeInstalledAssets(req, res, installedAssets, cb) {
 }
 
 function backupTheme(req, res, assets, themeId, cb) {
-  const fs = require("fs");
-  const shell = require("shelljs");
   const AdmZip = require("adm-zip");
   const zip = new AdmZip();
   const assetsBaseUrl = "https://assets.insales.ru";
-  const tempFolder = path.join(__basedir, "/temp");
-  const targetPath = `${tempFolder}/${themeId}`;
   const folders = {
     configuration: "config",
     media: "media",
@@ -250,12 +246,6 @@ function backupTheme(req, res, assets, themeId, cb) {
   const backup = [];
   assets.forEach(async (asset, index) => {
     const typeFolder = folders[asset.type.replace("Asset::", "").toLowerCase()];
-    /*
-    shell.mkdir("-p", `${targetPath}/${typeFolder}`);
-    //shell.rm("-rf", folderPath)
-    const file = fs.createWriteStream(
-      `${targetPath}/${typeFolder}/${asset["human_readable_name"]}`
-    );*/
     const url = `${assetsBaseUrl}${asset["asset_url"]}`;
     try {
       const urlResponse = await axios.get(url);
@@ -275,7 +265,6 @@ function backupTheme(req, res, assets, themeId, cb) {
       } catch (e) {
         console.log(e);
       }
-      //response.pipe(file);
       if (backup.length === assets.length) {
         return cb(zip.toBuffer());
       }
@@ -290,9 +279,9 @@ function backupTheme(req, res, assets, themeId, cb) {
           backup.push(asset);
           if (backup.length === assets.length) {
             try {
-              const fileToSend = await zip.toBuffer();
+              const fileToSend = zip.toBuffer();
               return cb(fileToSend);
-            }catch (e) {
+            } catch (e) {
               console.log(e)
             }
           }
