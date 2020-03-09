@@ -27,5 +27,21 @@ module.exports = [
   {
     src: "af_assets_bottom.liquid",
     type: "Asset::Snippet"
+  },
+  {
+    src: "af_json_filters.liquid",
+    type: "Asset::Snippet"
+  },
+  {
+    src: "af_json_filters_property.liquid",
+    type: "Asset::Snippet"
+  },
+  {
+    src: "af_json_filters_price.liquid",
+    type: "Asset::Snippet"
+  },
+  {
+    src: "af_json_filters_option.liquid",
+    type: "Asset::Snippet"
   }
 ];

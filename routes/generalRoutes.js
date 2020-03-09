@@ -35,7 +35,7 @@ module.exports = function(app) {
         url: res.user.shop
       });
       res.send(
-        data.map(theme => ({
+        data.filter(theme => !theme["is_published"]).map(theme => ({
           ...theme,
           installed:
             (!!res.user["installedThemeVersion"] &&
@@ -103,16 +103,29 @@ module.exports = function(app) {
       0;
     const assetsList = await getThemeAssets(req, res);
     let installedAssets = getInstalledAssets(assetsList);
+
     if (
       cdn.data.version === thisInstalledThemeVersion &&
       installedAssets.length === assets.length
     ) {
       return res.status(400).send("Установлена последняя версия");
     }
+
+    if(!thisInstalledThemeVersion) {
+      /* If App didn't install on this theme yet */
+      let layoutAssetId;
+      assetsList.some(asset => {
+        if(asset["inner_file_name"] === "layouts.layout.liquid") {
+          return layoutAssetId = asset.id
+        }
+      });
+      includeRecources(layoutAssetId);
+    }
+
     if (!installedAssets.length) {
-      /*backupTheme(assetsList, themeId, () => {
+      backupTheme(req, res, assetsList, themeId, () => {
         uploadAssets();
-      });*/
+      });
     } else {
       removeInstalledAssets(req, res, installedAssets, () => {
         uploadAssets();
@@ -176,6 +189,25 @@ module.exports = function(app) {
             });
         }, 1000);
       });
+    }
+
+    async function includeRecources(layoutAssetId) {
+      const layout = await getThemeAsset(req, res, layoutAssetId);
+      const replacedContent = layout.content.replace("</head>", "{% include 'af_assets_top' %}</head>").replace("</body>", "{% include 'af_assets_bottom' %}</body>");
+      try {
+        const {data} = await inSalesApi.editAsset({
+          token: res.user.password,
+          url: res.user.shop,
+          theme: req.query["themeId"],
+          assetId: layoutAssetId,
+          asset: {
+            content: replacedContent
+          }
+        });
+        return data
+      } catch(e) {
+        console.log(e)
+      }
     }
   });
 
