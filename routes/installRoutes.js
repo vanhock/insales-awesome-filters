@@ -1,4 +1,6 @@
+const withAuth = require("../middleware");
 const { getPassword } = require("../helpers");
+const { uninstallFromTheme } = require("../controllers/themesController");
 module.exports = function(app) {
   app.get("/install", (req, res) => {
     const { shop, token, insales_id } = req.query;
@@ -26,22 +28,40 @@ module.exports = function(app) {
       });
   });
 
-  app.get("/uninstall", (req, res) => {
-    const { shop, token, insales_id } = req.query;
-    app.locals.collection
-      .findOneAndDelete({
-        shop: shop,
-        insales_id: insales_id,
-        password: token
-      })
-      .then(({ value }) => {
-        if (!value || !Object.keys(value).length) {
-          return res.status(400).send("Wrong credentials");
+  app.get("/uninstall", withAuth, async (req, res) => {
+    const installedThemes = res.user.installedThemeVersion;
+    if (installedThemes && Object.keys(installedThemes).length) {
+      for (let key in installedThemes) {
+        if (installedThemes.hasOwnProperty(key)) {
+          req.query.themeId = key;
+          try {
+            await uninstallFromTheme(req, res);
+          } catch (e) {
+            console.log(e.message || e);
+          }
         }
-        return res.status(200).send("Ok!");
-      })
-      .catch(() => {
-        return res.status(500).send("Something wrong on the server!");
-      });
+      }
+    }
+    try {
+      res.locals.collection.findOneAndUpdate(
+        {
+          shop: res.user.shop
+        },
+        {
+          $unset: [
+            "installedThemeVersion",
+            "version",
+            "af_token",
+            "user_id",
+            "auth_verify_token",
+            "insales_id",
+            "password"
+          ]
+        }
+      );
+      return res.status(200);
+    } catch (e) {
+      res.status(400).send("Что-то пошло не так");
+    }
   });
 };

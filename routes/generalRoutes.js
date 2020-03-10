@@ -4,6 +4,14 @@ const path = require("path");
 const { checkAuth, inSalesApi, throttle } = require("../helpers");
 
 const withAuth = require("../middleware");
+const {
+  uninstallFromTheme,
+  getInstalledAssets,
+  removeInstalledAssets,
+  backupTheme,
+  getThemeAsset,
+  getThemeAssets
+} = require("../controllers/themesController");
 module.exports = function(app) {
   app.get("/", (req, res) => {
     const af_token = req.cookies["af_token"];
@@ -35,13 +43,15 @@ module.exports = function(app) {
         url: res.user.shop
       });
       res.send(
-        data.filter(theme => !theme["is_published"]).map(theme => ({
-          ...theme,
-          installed:
-            (!!res.user["installedThemeVersion"] &&
-              res.user["installedThemeVersion"][theme.id]) ||
-            false
-        }))
+        data
+          .filter(theme => !theme["is_published"])
+          .map(theme => ({
+            ...theme,
+            installed:
+              (!!res.user["installedThemeVersion"] &&
+                res.user["installedThemeVersion"][theme.id]) ||
+              false
+          }))
       );
     } catch (e) {
       console.log(e);
@@ -49,43 +59,11 @@ module.exports = function(app) {
   });
 
   app.post("/uninstall-from-theme", withAuth, async (req, res) => {
-    const themeId = req.query["themeId"];
-    const assetsList = await getThemeAssets(req, res);
-    let installedAssets = getInstalledAssets(assetsList);
-    let removedAssets = 0;
-    if (installedAssets.length) {
-      installedAssets.forEach(id => {
-        setTimeout(async () => {
-          await inSalesApi.removeAsset({
-            token: res.user.password,
-            url: res.user.shop,
-            theme: themeId,
-            assetId: id
-          });
-          ++removedAssets;
-          if (removedAssets === installedAssets.length) {
-            const response = await app.locals.collection.findOne({
-              shop: res.user.shop
-            });
-
-            const installedThemeVersion =
-              response["installedThemeVersion"] || {};
-            delete installedThemeVersion[themeId];
-
-            await app.locals.collection.updateOne(
-              { shop: res.user.shop },
-              {
-                $set: {
-                  installedThemeVersion: installedThemeVersion
-                }
-              }
-            );
-            return res.status(200);
-          }
-        }, 1000);
-      });
-    } else {
-      return res.status(400).send("Нет ресурсов для удаления");
+    try {
+      await uninstallFromTheme(req, res)
+      res.status(200);
+    } catch(e) {
+      return res.status(e.status).send(e.message);
     }
   });
 
@@ -101,8 +79,8 @@ module.exports = function(app) {
     let cdn;
     try {
       cdn = await axios.get(assetBaseUrl + "/package.json");
-    } catch(e) {
-      console.log(e)
+    } catch (e) {
+      console.log(e);
     }
     const thisInstalledThemeVersion =
       (!!res.user["installedThemeVersion"] &&
@@ -118,17 +96,17 @@ module.exports = function(app) {
       return res.status(400).send("Установлена последняя версия");
     }
 
-    if(!thisInstalledThemeVersion) {
+    if (!thisInstalledThemeVersion) {
       /* If App didn't install on this theme yet */
       let layoutAssetId;
       assetsList.some(asset => {
-        if(asset["inner_file_name"] === "layouts.layout.liquid") {
-          return layoutAssetId = asset.id
+        if (asset["inner_file_name"] === "layouts.layout.liquid") {
+          return (layoutAssetId = asset.id);
         }
       });
       await includeRecources(layoutAssetId);
     }
-    
+
     if (installedAssets.length) {
       removeInstalledAssets(req, res, installedAssets, () => {
         uploadAssets();
@@ -143,18 +121,21 @@ module.exports = function(app) {
         success: false
       };
       let replace = false;
-      if(collectionFolder) {
+      if (collectionFolder) {
         let templateAssetId;
         assetsList.some(asset => {
-          if(asset["inner_file_name"] === "collection.liquid") {
-            return templateAssetId = asset.id
+          if (asset["inner_file_name"] === "collection.liquid") {
+            return (templateAssetId = asset.id);
           }
         });
-        replace = await replaceCollectionTemplate(templateAssetId, collectionFolder);
+        replace = await replaceCollectionTemplate(
+          templateAssetId,
+          collectionFolder
+        );
       } else {
         replace = true;
       }
-      if(replace) {
+      if (replace) {
         const success = [];
         assets.forEach(asset => {
           setTimeout(() => {
@@ -213,14 +194,20 @@ module.exports = function(app) {
     async function includeRecources(layoutAssetId) {
       const layout = await getThemeAsset(req, res, layoutAssetId);
       let replacedContent = layout.content;
-      if(!replacedContent.includes("{% include 'af_assets_top' %}")) {
-        replacedContent = replacedContent.replace("</head>", "{% include 'af_assets_top' %}</head>");
+      if (!replacedContent.includes("{% include 'af_assets_top' %}")) {
+        replacedContent = replacedContent.replace(
+          "</head>",
+          "{% include 'af_assets_top' %}</head>"
+        );
       }
-      if(!replacedContent.includes("{% include 'af_assets_bottom' %}")) {
-        replacedContent = replacedContent.replace("</body>", "{% include 'af_assets_bottom' %}</body>");
+      if (!replacedContent.includes("{% include 'af_assets_bottom' %}")) {
+        replacedContent = replacedContent.replace(
+          "</body>",
+          "{% include 'af_assets_bottom' %}</body>"
+        );
       }
       try {
-        const {data} = await inSalesApi.editAsset({
+        const { data } = await inSalesApi.editAsset({
           token: res.user.password,
           url: res.user.shop,
           theme: req.query["themeId"],
@@ -229,9 +216,9 @@ module.exports = function(app) {
             content: replacedContent
           }
         });
-        return data
-      } catch(e) {
-        console.log(e)
+        return data;
+      } catch (e) {
+        console.log(e);
       }
     }
 
@@ -240,9 +227,11 @@ module.exports = function(app) {
       const oldCollection = await getThemeAsset(req, res, assetId);
       let newCollection;
       try {
-        newCollection = await axios.get(`${assetBaseUrl}@${cdn.data.version}/dist/template/${folder}/collection.liquid`);
+        newCollection = await axios.get(
+          `${assetBaseUrl}@${cdn.data.version}/dist/template/${folder}/collection.liquid`
+        );
       } catch (e) {
-        console.log(e)
+        console.log(e);
       }
       try {
         await inSalesApi.uploadAsset({
@@ -250,15 +239,17 @@ module.exports = function(app) {
           url: res.user.shop,
           theme: req.query["themeId"],
           asset: {
-            name: `backup-${moment().format('YYYY-MM-D-HH-mm')}.collection.liquid`,
+            name: `backup-${moment().format(
+              "YYYY-MM-D-HH-mm"
+            )}.collection.liquid`,
             content: oldCollection.content,
             type: "Asset::Template"
           }
-        })
+        });
       } catch (e) {
-        console.log(e)
+        console.log(e);
       }
-      
+
       try {
         const result = await inSalesApi.editAsset({
           token: res.user.password,
@@ -271,7 +262,7 @@ module.exports = function(app) {
         });
         return result;
       } catch (e) {
-        console.log(e)
+        console.log(e);
       }
     }
   });
@@ -280,9 +271,8 @@ module.exports = function(app) {
     /**
      * Backup theme if app not installed yet
      */
-    const { themeId } = req.query;
     const assets = await getThemeAssets(req, res);
-    backupTheme(req, res, assets, themeId, data => {
+    backupTheme(req, res, assets, data => {
       res.status(200).send(data);
     });
   });
@@ -297,123 +287,4 @@ function getErrors(response) {
     }
   }
   return errors;
-}
-
-function getInstalledAssets(assets) {
-  return assets
-    .filter(({ inner_file_name }) => inner_file_name.includes("af_"))
-    .map(({ id }) => id);
-}
-
-function removeInstalledAssets(req, res, installedAssets, cb) {
-  let removedAssets = 0;
-  if (installedAssets.length) {
-    installedAssets.forEach(id => {
-      setTimeout(() => {
-        inSalesApi
-          .removeAsset({
-            token: res.user.password,
-            url: res.user.shop,
-            theme: req.query["themeId"],
-            assetId: id
-          })
-          .then(() => {
-            ++removedAssets;
-            if (removedAssets === installedAssets.length) {
-              cb();
-            }
-          });
-      }, 1000);
-    });
-  } else {
-    cb();
-  }
-}
-
-function backupTheme(req, res, assets, themeId, cb) {
-  const AdmZip = require("adm-zip");
-  const zip = new AdmZip();
-  const assetsBaseUrl = "https://assets.insales.ru";
-  const folders = {
-    configuration: "config",
-    media: "media",
-    snippet: "snippets",
-    template: "templates"
-  };
-  const backup = [];
-  assets.forEach(async (asset, index) => {
-    const typeFolder = folders[asset.type.replace("Asset::", "").toLowerCase()];
-    const url = `${assetsBaseUrl}${asset["asset_url"]}`;
-    try {
-      const urlResponse = await axios.get(url);
-      const { data } = urlResponse;
-      const size =
-        Array.isArray(data) || typeof data === "string"
-          ? data.length
-          : typeof data === "object"
-            ? Object.keys(data).length
-            : 0;
-      try {
-        backup.push(asset);
-        zip.addFile(
-          `${typeFolder}/${asset["human_readable_name"]}`,
-          Buffer.alloc(size, data)
-        );
-      } catch (e) {
-        console.log(e);
-      }
-      if (backup.length === assets.length) {
-        return cb(zip.toBuffer());
-      }
-    } catch (e) {
-      setTimeout(async () => {
-        const data = await getThemeAsset(req, res, asset.id);
-        if (data) {
-          zip.addFile(
-            `${typeFolder}/${asset["human_readable_name"]}`,
-            data.content
-          );
-          backup.push(asset);
-          if (backup.length === assets.length) {
-            try {
-              const fileToSend = zip.toBuffer();
-              return cb(fileToSend);
-            } catch (e) {
-              console.log(e)
-            }
-          }
-        }
-      }, 1000);
-    }
-  });
-}
-
-async function getThemeAsset(req, res, assetId) {
-  try {
-    const { data } = await inSalesApi.getAsset({
-      token: res.user.password,
-      url: res.user.shop,
-      theme: req.query["themeId"],
-      assetId: assetId
-    });
-    return data;
-  } catch (e) {
-    console.log(e);
-  }
-}
-
-async function getThemeAssets(req, res) {
-  try {
-    const { data } = await inSalesApi.listAsset({
-      token: res.user.password,
-      url: res.user.shop,
-      theme: req.query["themeId"]
-    });
-    return data;
-  } catch ({ response }) {
-    if (response.statusCode !== 422) {
-      return res.status(500);
-    }
-    res.status(400).send(getErrors(response));
-  }
 }
