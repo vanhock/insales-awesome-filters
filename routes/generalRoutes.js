@@ -4,15 +4,17 @@ const path = require("path");
 const { checkAuth, inSalesApi, throttle } = require("../helpers");
 
 const withAuth = require("../middleware");
-const {
-  uninstallFromTheme,
-  getInstalledAssets,
-  removeInstalledAssets,
-  backupTheme,
-  getThemeAsset,
-  getThemeAssets
-} = require("../controllers/themesController");
+
 module.exports = function(app) {
+  const {
+    uninstallFromTheme,
+    getInstalledAssets,
+    removeInstalledAssets,
+    backupTheme,
+    getThemeAsset,
+    getThemeAssets
+  } = require("../controllers/themesController")(app);
+
   app.get("/", (req, res) => {
     const af_token = req.cookies["af_token"];
     checkAuth(app, af_token)
@@ -60,10 +62,12 @@ module.exports = function(app) {
 
   app.post("/uninstall-from-theme", withAuth, async (req, res) => {
     try {
-      await uninstallFromTheme(req, res)
-      res.status(200);
-    } catch(e) {
-      return res.status(e.status).send(e.message);
+      const result = await uninstallFromTheme(req, res);
+      if(result) {
+        res.status(200).send("ok");
+      }
+    } catch (e) {
+      return res.status(400).send(e.message || e);
     }
   });
 
@@ -137,10 +141,10 @@ module.exports = function(app) {
       }
       if (replace) {
         const success = [];
-        assets.forEach(asset => {
-          setTimeout(() => {
-            inSalesApi
-              .uploadAsset({
+        assets.forEach(async asset => {
+          setTimeout(async () => {
+            try {
+              const { data } = await inSalesApi.uploadAsset({
                 token: res.user.password,
                 url: res.user.shop,
                 theme: themeId,
@@ -149,43 +153,40 @@ module.exports = function(app) {
                   src: `${assetBaseUrl}@${cdn.data.version}/dist/${asset.src}`,
                   type: asset.type
                 }
-              })
-              .then(({ data }) => {
-                result.report[data.inner_file_name] = "ok";
-                success.push(data.inner_file_name);
-                if (success.length === assets.length) {
-                  result.success = true;
-                  app.locals.collection
-                    .findOne({ shop: res.user.shop })
-                    .then(response => {
-                      const installedThemeVersion =
-                        response["installedThemeVersion"] || {};
-                      installedThemeVersion[themeId] = cdn.data.version;
-                      app.locals.collection.updateOne(
-                        { shop: res.user.shop },
-                        {
-                          $set: {
-                            installedThemeVersion: installedThemeVersion
-                          }
-                        }
-                      );
-                    });
-                }
-                if (Object.keys(result.report).length === assets.length) {
-                  return res.status(200).send(result);
-                }
-              })
-              .catch(({ response }) => {
-                if (response.statusCode !== 422) {
-                  return res.status(500);
-                }
-                result.report[response.options.body.asset.name] = getErrors(
-                  response
-                );
-                if (Object.keys(result.report).length === assets.length) {
-                  return res.status(200).send(result);
-                }
               });
+              result.report[data.inner_file_name] = "ok";
+              success.push(data.inner_file_name);
+            } catch ({ response }) {
+              if (response.statusCode !== 422) {
+                return res.status(500);
+              }
+              result.report[response.options.body.asset.name] = getErrors(
+                response
+              );
+              if (Object.keys(result.report).length === assets.length) {
+                return res.status(200).send(result);
+              }
+            }
+            if (success.length === assets.length) {
+              result.success = true;
+            } 
+            if (Object.keys(result.report).length === assets.length) {
+              const response = await app.locals.collection.findOne({
+                shop: res.user.shop
+              });
+              const installedThemeVersion =
+                response["installedThemeVersion"] || {};
+              installedThemeVersion[themeId] = cdn.data.version;
+              await app.locals.collection.updateOne(
+                { shop: res.user.shop },
+                {
+                  $set: {
+                    installedThemeVersion: installedThemeVersion
+                  }
+                }
+              );
+              return res.status(200).send(result);
+            }
           }, 1000);
         });
       }
