@@ -62,10 +62,7 @@ module.exports = function(app) {
 
   app.post("/uninstall-from-theme", withAuth, async (req, res) => {
     try {
-      const result = await uninstallFromTheme(req, res);
-      if(result) {
-        res.status(200).send("ok");
-      }
+      await uninstallFromTheme(req, res);
     } catch (e) {
       return res.status(400).send(e.message || e);
     }

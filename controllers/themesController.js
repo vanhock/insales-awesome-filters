@@ -6,9 +6,9 @@ module.exports = function(app) {
     const assetsList = await getThemeAssets(req, res);
     let installedAssets = await getInstalledAssets(assetsList);
     let removedAssets = 0;
-    async function removeThemeAssets() {
+    function removeThemeAssets(cb) {
       if (installedAssets.length) {
-         const result = await installedAssets.some(id => {
+        const result = installedAssets.some(id => {
           setTimeout(async () => {
             try {
               await inSalesApi.removeAsset({
@@ -17,10 +17,10 @@ module.exports = function(app) {
                 theme: themeId,
                 assetId: id
               });
-            } catch(e) {
-              console.log(e)
+            } catch (e) {
+              console.log(e);
             }
-          
+
             ++removedAssets;
             if (removedAssets === installedAssets.length) {
               const response = await app.locals.collection.findOne({
@@ -31,7 +31,7 @@ module.exports = function(app) {
                 response["installedThemeVersion"] || {};
               delete installedThemeVersion[themeId];
 
-              return await app.locals.collection.updateOne(
+              const result = await app.locals.collection.updateOne(
                 { shop: res.user.shop },
                 {
                   $set: {
@@ -39,12 +39,12 @@ module.exports = function(app) {
                   }
                 }
               );
+              return cb(result);
             }
           }, 1000);
         });
-        return result
       } else {
-        return true;
+        return cb();
         console.log("Нет ресурсов для удаления");
       }
     }
@@ -71,7 +71,7 @@ module.exports = function(app) {
         );
       }
       try {
-        return await inSalesApi.editAsset({
+        inSalesApi.editAsset({
           token: res.user.password,
           url: res.user.shop,
           theme: req.query["themeId"],
@@ -87,9 +87,10 @@ module.exports = function(app) {
     /**
      * Remove snippets includes from layouts.layout.liquid
      */
-    const isRemoveThemeAssets = await removeThemeAssets();
-    const isRemoveSnippetsIncludes = await removeSnippetsIncludes();
-    return isRemoveThemeAssets && isRemoveSnippetsIncludes;
+    await removeSnippetsIncludes();
+    removeThemeAssets(() => {
+      res.status(200).send(true);
+    });
   };
 
   const getInstalledAssets = assets => {
@@ -182,7 +183,7 @@ module.exports = function(app) {
               }
             }
           }
-        }, 1000);
+        }, 3000);
       }
     });
   };
