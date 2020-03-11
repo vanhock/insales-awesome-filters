@@ -1,5 +1,5 @@
 const { inSalesApi } = require("../helpers");
-
+const axios = require("axios");
 module.exports = function(app) {
   const uninstallFromTheme = async (req, res) => {
     const themeId = req.query["themeId"];
@@ -183,7 +183,7 @@ module.exports = function(app) {
               }
             }
           }
-        }, 3000);
+        }, 4000);
       }
     });
   };
