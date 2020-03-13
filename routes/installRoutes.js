@@ -2,30 +2,47 @@ const withAuth = require("../middleware");
 const { getPassword } = require("../helpers");
 const { uninstallFromTheme } = require("../controllers/themesController");
 module.exports = function(app) {
-  app.get("/install", (req, res) => {
+  app.get("/install", async (req, res) => {
     const { shop, token, insales_id } = req.query;
     if (!shop || !token || !insales_id) {
       return res.status(400).send("Has no required params!");
     }
-    app.locals.collection.findOne(
-      { shop: shop, insales_id: insales_id },
-      function(err, account) {
-        if (account) return res.status(400).send("Already installed!");
+    try {
+      const shop = await app.locals.collection.findOne({ shop: shop });
+      if (shop && shop.insales_id === insales_id) {
+        return restore();
       }
-    );
-    app.locals.collection
-      .insertOne({
-        shop: shop,
-        password: getPassword(token),
-        insales_id: insales_id
-      })
-      .then(({ result, error }) => {
+    } catch (e) {
+      console.log(e)
+    }
+
+    install();
+
+    async function restore() {
+      try {
+        const { error } = await app.locals.collection.findOneAndUpdate(
+          { shop: shop },
+          { $set: { password: getPassword(token), insales_id: insales_id } }
+        );
         if (error) return console.log(error);
         return res.status(200).send("Ok!");
-      })
-      .catch(() => {
-        return res.status(500).send("Something wrong on the server!");
-      });
+      } catch (e) {
+        res.status(500).send("Something wrong on the server!");
+      }
+    }
+    async function install() {
+      try {
+        const { error } = await app.locals.collection.insertOne({
+          shop: shop,
+          password: getPassword(token),
+          insales_id: insales_id
+        });
+        if (error) return console.log(error);
+        return res.status(200).send("Ok!");
+      } catch (e) {
+        res.status(500).send("Something wrong on the server!");
+      }
+    }
   });
 
   app.get("/uninstall", withAuth, async (req, res) => {
@@ -54,7 +71,6 @@ module.exports = function(app) {
             "af_token",
             "user_id",
             "auth_verify_token",
-            "insales_id",
             "password"
           ]
         }
