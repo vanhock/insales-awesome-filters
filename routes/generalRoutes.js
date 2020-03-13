@@ -94,7 +94,7 @@ module.exports = function(app) {
       cdn.data.version === thisInstalledThemeVersion &&
       installedAssets.length === assets.length
     ) {
-      return res.status(400).send("Установлена последняя версия");
+      return res.status(200).send("Установлена последняя версия");
     }
 
     if (!thisInstalledThemeVersion) {
