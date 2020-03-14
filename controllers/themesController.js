@@ -41,7 +41,7 @@ module.exports = function(app) {
               );
               return cb(result);
             }
-          }, 1000);
+          }, 4000);
         });
       } else {
         return cb();
@@ -117,7 +117,7 @@ module.exports = function(app) {
                 cb();
               }
             });
-        }, 1000);
+        }, 4000);
       });
     } else {
       cb();

@@ -98,7 +98,7 @@ module.exports = function(app) {
     }
 
     if (!thisInstalledThemeVersion) {
-      /* If App didn't install on this theme yet */
+      /* If App didn't install on this theme yet, include theme resources links */
       let layoutAssetId;
       assetsList.some(asset => {
         if (asset["inner_file_name"] === "layouts.layout.liquid") {
