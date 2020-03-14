@@ -1,4 +1,3 @@
-const axios = require("axios");
 const crypto = require("crypto");
 const getPassword = function(token) {
   const data = token + process.env.APP_SECRET;
@@ -9,6 +8,7 @@ const getPassword = function(token) {
 };
 
 const checkAuth = function(app, token) {
+  const errorMessage = "Ошибка авторизации. Пожалуйста, зайдите в приложение AwesomeFilters через бек-офис вашего сайта";
   return new Promise((resolve, reject) => {
     app.locals.collection
       .findOne({
@@ -16,12 +16,12 @@ const checkAuth = function(app, token) {
       })
       .then(user => {
         if (!user) {
-          return reject("Ошибка авторизации, зайдите в приложение через бек-офис сайта");
+          return reject(errorMessage);
         }
         return resolve(user);
       })
       .catch(() => {
-        return reject("Authentication failed!");
+        return reject(errorMessage);
       });
   });
 };

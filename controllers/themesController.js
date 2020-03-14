@@ -125,8 +125,8 @@ module.exports = function(app) {
   };
 
   const backupTheme = (req, res, assets, cb) => {
-    const AdmZip = require("adm-zip");
-    const zip = new AdmZip();
+    const archiver = require('archiver');
+    const archive = archiver('zip')
     const assetsBaseUrl = "https://assets.insales.ru";
     const folders = {
       configuration: "config",
@@ -134,7 +134,12 @@ module.exports = function(app) {
       snippet: "snippets",
       template: "templates"
     };
+    res.attachment("archives.zip");
+    archive.pipe(res);
     const backup = [];
+    archive.on("error", (e) => {
+      console.log(e.message);
+    });
     assets.forEach(async asset => {
       const typeFolder =
         folders[asset.type.replace("Asset::", "").toLowerCase()];
@@ -142,23 +147,16 @@ module.exports = function(app) {
       try {
         const urlResponse = await axios.get(url);
         const { data } = urlResponse;
-        const size =
-          Array.isArray(data) || typeof data === "string"
-            ? data.length
-            : typeof data === "object"
-            ? Object.keys(data).length
-            : 0;
+        const textData = typeof data === "object" ? JSON.stringify(data) : data;
         try {
+          
           backup.push(asset);
-          zip.addFile(
-            `${typeFolder}/${asset["human_readable_name"]}`,
-            Buffer.alloc(size, data)
-          );
+          archive.append(textData, { name: `${typeFolder}/${asset["inner_file_name"]}` });
         } catch (e) {
           console.log(e);
         }
         if (backup.length === assets.length) {
-          return cb(zip.toBuffer());
+          return cb(archive.finalize());
         }
       } catch (e) {
         /*
@@ -168,15 +166,17 @@ module.exports = function(app) {
 
         setTimeout(async () => {
           const data = await getThemeAsset(req, res, asset.id);
-          if (data) {
-            zip.addFile(
-              `${typeFolder}/${asset["human_readable_name"]}`,
-              data.content
-            );
+          const {content} = data;
+          let textData = typeof content === "object" ? JSON.stringify(content) : content;
+          if(!content) {
+            textData = " ";
+          } 
+          if (textData) {
+            archive.append(textData, { name: `${typeFolder}/${asset["inner_file_name"]}` });
             backup.push(asset);
             if (backup.length === assets.length) {
               try {
-                const fileToSend = zip.toBuffer();
+                const fileToSend = archive.finalize();
                 return cb(fileToSend);
               } catch (e) {
                 console.log(e);
