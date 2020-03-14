@@ -18,6 +18,7 @@ module.exports = function(app) {
         }
       })
       .catch(error => {
+        res.clearCookie("af_token");
         return res.status(500).send(error);
       });
     function login() {
@@ -87,6 +88,7 @@ module.exports = function(app) {
             res.redirect("/");
           });
       } else {
+        res.clearCookie("af_token");
         res.status(400).send("Ошибка авторизации, переустановите приложение");
       }
     });

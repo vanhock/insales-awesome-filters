@@ -1,15 +1,15 @@
 const withAuth = require("../middleware");
 const { getPassword } = require("../helpers");
-const { uninstallFromTheme } = require("../controllers/themesController");
 module.exports = function(app) {
+  const { uninstallFromTheme } = require("../controllers/themesController")(app);
   app.get("/install", async (req, res) => {
     const { shop, token, insales_id } = req.query;
     if (!shop || !token || !insales_id) {
       return res.status(400).send("Has no required params!");
     }
     try {
-      const shop = await app.locals.collection.findOne({ shop: shop });
-      if (shop && shop.insales_id === insales_id) {
+      const account = await app.locals.collection.findOne({ shop: shop });
+      if (account && account.insales_id === insales_id) {
         return restore();
       }
     } catch (e) {
@@ -45,8 +45,21 @@ module.exports = function(app) {
     }
   });
 
-  app.get("/uninstall", withAuth, async (req, res) => {
-    const installedThemes = res.user.installedThemeVersion;
+  app.get("/uninstall", async (req, res) => {
+    const {shop, token, insales_id} = req.query;
+    if (!shop || !token || !insales_id) {
+      return res.status(400).send("Has no required params!");
+    }
+    const account = await app.locals.collection.findOne({
+      shop: shop,
+      insales_id: insales_id,
+      password: token
+    });
+    if(!account) {
+      return res.status(401).send("Нет доступа для данной операции");
+    }
+    res.user = account;
+    const installedThemes = account.installedThemeVersion;
     if (installedThemes && Object.keys(installedThemes).length) {
       for (let key in installedThemes) {
         if (installedThemes.hasOwnProperty(key)) {
@@ -60,22 +73,22 @@ module.exports = function(app) {
       }
     }
     try {
-      res.locals.collection.findOneAndUpdate(
+      await app.locals.collection.findOneAndUpdate(
         {
-          shop: res.user.shop
+          shop: account.shop
         },
         {
-          $unset: [
-            "installedThemeVersion",
-            "version",
-            "af_token",
-            "user_id",
-            "auth_verify_token",
-            "password"
-          ]
+          $unset: {
+            "installedThemeVersion": "",
+            "af_token": "",
+            "user_id": "",
+            "auth_verify_token": "",
+            "password": ""
+          }
         }
       );
-      return res.status(200);
+      res.clearCookie("af_token");
+      res.status(200);
     } catch (e) {
       res.status(400).send("Что-то пошло не так");
     }

@@ -5,6 +5,7 @@ const withAuth = function(req, res, next) {
     })
     .then(user => {
       if (!user) {
+        res.clearCookie("af_token");
         return res
           .status(401)
           .send("Authentication failed! User does not exist!");
@@ -13,6 +14,7 @@ const withAuth = function(req, res, next) {
       return next();
     })
     .catch(() => {
+      res.clearCookie("af_token");
       return res
         .status(401)
         .send("Authentication failed! User does not exist!");

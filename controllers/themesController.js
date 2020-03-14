@@ -88,8 +88,8 @@ module.exports = function(app) {
      * Remove snippets includes from layouts.layout.liquid
      */
     await removeSnippetsIncludes();
-    removeThemeAssets(() => {
-      res.status(200).send(true);
+    return removeThemeAssets(() => {
+     return
     });
   };
 

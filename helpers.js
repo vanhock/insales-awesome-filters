@@ -16,7 +16,7 @@ const checkAuth = function(app, token) {
       })
       .then(user => {
         if (!user) {
-          return reject("Authentication failed! User does not exist!");
+          return reject("Ошибка авторизации, зайдите в приложение через бек-офис сайта");
         }
         return resolve(user);
       })
