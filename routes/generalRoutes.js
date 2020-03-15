@@ -170,10 +170,6 @@ module.exports = function(app) {
               } else {
                 result.report[data && data.inner_file_name || asset.src] = "ok";
                 success.push(data && data.inner_file_name || asset.src);
-  
-                if (Object.keys(result.report).length === assets.length) {
-                  return res.status(200).send(result);
-                }
               }
             } else {
               /**
