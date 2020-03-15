@@ -93,9 +93,9 @@ module.exports = function(app) {
     });
   };
 
-  const getInstalledAssets = assets => {
+  const getInstalledAssets = (assets, exclude = []) => {
     return assets
-      .filter(({ inner_file_name }) => inner_file_name.includes("af_"))
+      .filter(({ inner_file_name }) => inner_file_name.includes("af_") && !exclude.some(e => inner_file_name.includes(e)))
       .map(({ id }) => id);
   };
 
@@ -128,6 +128,7 @@ module.exports = function(app) {
     const archiver = require('archiver');
     const archive = archiver('zip')
     const assetsBaseUrl = "https://assets.insales.ru";
+
     const folders = {
       configuration: "config",
       media: "media",

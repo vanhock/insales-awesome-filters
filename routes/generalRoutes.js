@@ -88,8 +88,8 @@ module.exports = function(app) {
       (!!res.user["installedThemeVersion"] &&
         res.user["installedThemeVersion"][themeId]) ||
       0;
-    const assetsList = await getThemeAssets(req, res);
-    let installedAssets = getInstalledAssets(assetsList);
+    const installedAssetsList = await getThemeAssets(req, res);
+    let installedAssets = getInstalledAssets(installedAssetsList, ["js", "css"]);
 
     if (
       cdn.data.version === thisInstalledThemeVersion &&
@@ -101,7 +101,7 @@ module.exports = function(app) {
     if (!thisInstalledThemeVersion) {
       /* If App didn't install on this theme yet, include theme resources links */
       let layoutAssetId;
-      assetsList.some(asset => {
+      installedAssetsList.some(asset => {
         if (asset["inner_file_name"] === "layouts.layout.liquid") {
           return (layoutAssetId = asset.id);
         }
@@ -110,22 +110,36 @@ module.exports = function(app) {
     }
 
     if (installedAssets.length) {
+      /** Remove istalled assets (but .js, .css) first */
       removeInstalledAssets(req, res, installedAssets, () => {
-        uploadAssets();
+        uploadAssets(true); /* With updateTheme flag */
       });
     } else {
       uploadAssets();
     }
 
-    async function uploadAssets() {
+    async function uploadAssets(updateTheme) {
       const result = {
         report: {},
         success: false
       };
       let replace = false;
+      let assetsForUpdate = [];
+      if (updateTheme) {
+        assetsForUpdate = installedAssetsList.filter(
+          a =>
+            a["inner_file_name"].includes("af_") &&
+            (a["inner_file_name"].includes(".js") ||
+              a["inner_file_name"].includes(".css"))
+        );
+      }
+
       if (collectionFolder) {
+        /**
+         * Update collection template if collectionFolder specified
+         */
         let templateAssetId;
-        assetsList.some(asset => {
+        installedAssetsList.some(asset => {
           if (asset["inner_file_name"] === "collection.liquid") {
             return (templateAssetId = asset.id);
           }
@@ -137,37 +151,40 @@ module.exports = function(app) {
       } else {
         replace = true;
       }
-      if (replace) {
+
+      if (replace/* wait while collection template updated or not */) {
         const success = [];
+
         assets.forEach(async asset => {
           setTimeout(async () => {
-            try {
-              const { data } = await inSalesApi.uploadAsset({
-                token: res.user.password,
-                url: res.user.shop,
-                theme: themeId,
-                asset: {
-                  name: asset.src,
-                  src: `${assetBaseUrl}@${cdn.data.version}/dist/${asset.src}`,
-                  type: asset.type
+            /**
+             * Update .js, .css resources
+             **/
+            if (
+              (updateTheme && asset.src.includes(".js")) ||
+              asset.src.includes(".css")
+            ) {
+              const { data } = await updateAsset(asset.src, assetsForUpdate);
+              if(!data) {
+                await uploadAssetToTheme(asset);
+              } else {
+                result.report[data && data.inner_file_name || asset.src] = "ok";
+                success.push(data && data.inner_file_name || asset.src);
+  
+                if (Object.keys(result.report).length === assets.length) {
+                  return res.status(200).send(result);
                 }
-              });
-              result.report[data.inner_file_name] = "ok";
-              success.push(data.inner_file_name);
-            } catch ({ response }) {
-              if (response.statusCode !== 422) {
-                return res.status(500);
               }
-              result.report[response.options.body.asset.name] = getErrors(
-                response
-              );
-              if (Object.keys(result.report).length === assets.length) {
-                return res.status(200).send(result);
-              }
+            } else {
+              /**
+               * Upload other resources
+               **/
+              await uploadAssetToTheme(asset)
             }
+
             if (success.length === assets.length) {
               result.success = true;
-            } 
+            }
             if (Object.keys(result.report).length === assets.length) {
               const response = await app.locals.collection.findOne({
                 shop: res.user.shop
@@ -185,8 +202,61 @@ module.exports = function(app) {
               );
               return res.status(200).send(result);
             }
+            
           }, 1000);
         });
+
+        async function uploadAssetToTheme(asset) {
+          try {
+            const { data } = await inSalesApi.uploadAsset({
+              token: res.user.password,
+              url: res.user.shop,
+              theme: req.query["themeId"],
+              asset: {
+                name: asset.src,
+                src: `${assetBaseUrl}@${cdn.data.version}/dist/${asset.src}`,
+                type: asset.type
+              }
+            });
+            result.report[data.inner_file_name] = "ok";
+            success.push(data.inner_file_name);
+          } catch ({ response }) {
+            if (response.statusCode !== 422) {
+              return res.status(500);
+            }
+            result.report[response.options.body.asset.name] = getErrors(
+              response
+            );
+            if (Object.keys(result.report).length === assets.length) {
+              return res.status(200).send(result);
+            }
+          }
+        }
+  
+        async function updateAsset(name, assetsForUpdate) {
+          const asset = assetsForUpdate.filter(
+            a => a["inner_file_name"] === name
+          )[0];
+          if (!asset) {
+            return true;
+          }
+          const { data } = await axios.get(
+            `${assetBaseUrl}@${cdn.data.version}/dist/${name}`
+          );
+          try {
+            return await inSalesApi.editAsset({
+              token: res.user.password,
+              url: res.user.shop,
+              theme: req.query["themeId"],
+              assetId: asset.id,
+              asset: {
+                content: data
+              }
+            });
+          } catch (e) {
+            console.log(e);
+          }
+        }
       }
     }
 
