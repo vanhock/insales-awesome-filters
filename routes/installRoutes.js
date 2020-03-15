@@ -60,37 +60,44 @@ module.exports = function(app) {
     }
     res.user = account;
     const installedThemes = account.installedThemeVersion;
+    const removedThemes = [];
     if (installedThemes && Object.keys(installedThemes).length) {
       for (let key in installedThemes) {
         if (installedThemes.hasOwnProperty(key)) {
           req.query.themeId = key;
           try {
-            await uninstallFromTheme(req, res);
+            const theme = await uninstallFromTheme(req, res);
+            removedThemes.push(theme);
+            if(removedThemes.length === Object.keys(installedThemes).length) {
+              return removeFromDatabase()
+            }
           } catch (e) {
             console.log(e.message || e);
           }
         }
       }
     }
-    try {
-      await app.locals.collection.findOneAndUpdate(
-        {
-          shop: account.shop
-        },
-        {
-          $unset: {
-            "installedThemeVersion": "",
-            "af_token": "",
-            "user_id": "",
-            "auth_verify_token": "",
-            "password": ""
+    async function removeFromDatabase() {
+      try {
+        await app.locals.collection.findOneAndUpdate(
+          {
+            shop: account.shop
+          },
+          {
+            $unset: {
+              "installedThemeVersion": "",
+              "af_token": "",
+              "user_id": "",
+              "auth_verify_token": "",
+              "password": ""
+            }
           }
-        }
-      );
-      res.clearCookie("af_token");
-      res.status(200);
-    } catch (e) {
-      res.status(400).send("Что-то пошло не так");
+        );
+        res.clearCookie("af_token");
+        res.status(200);
+      } catch (e) {
+        res.status(400).send("Что-то пошло не так");
+      }
     }
   });
 };

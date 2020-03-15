@@ -1,4 +1,4 @@
-const { inSalesApi } = require("../helpers");
+const { inSalesApi, delay } = require("../helpers");
 const axios = require("axios");
 module.exports = function(app) {
   const uninstallFromTheme = async (req, res) => {
@@ -6,47 +6,57 @@ module.exports = function(app) {
     const assetsList = await getThemeAssets(req, res);
     let installedAssets = await getInstalledAssets(assetsList);
     let removedAssets = 0;
-    function removeThemeAssets(cb) {
-      if (installedAssets.length) {
-        const result = installedAssets.some(id => {
-          setTimeout(async () => {
-            try {
-              await inSalesApi.removeAsset({
-                token: res.user.password,
-                url: res.user.shop,
-                theme: themeId,
-                assetId: id
-              });
-            } catch (e) {
-              console.log(e);
-            }
+    /**
+     * Remove snippets includes from layouts.layout.liquid
+     */
+    const removedAssetsResponse = await removeThemeAssets();
+    if(removedAssetsResponse) {
+      return await removeSnippetsIncludes();
+    }
 
-            ++removedAssets;
-            if (removedAssets === installedAssets.length) {
-              const response = await app.locals.collection.findOne({
-                shop: res.user.shop
-              });
-
-              const installedThemeVersion =
-                response["installedThemeVersion"] || {};
-              delete installedThemeVersion[themeId];
-
-              const result = await app.locals.collection.updateOne(
-                { shop: res.user.shop },
-                {
-                  $set: {
-                    installedThemeVersion: installedThemeVersion
+    function removeThemeAssets() {
+      return new Promise(resolve => {
+        if (installedAssets.length) {
+          installedAssets.forEach(id => {
+            setTimeout(async () => {
+              try {
+                const removed = await inSalesApi.removeAsset({
+                  token: res.user.password,
+                  url: res.user.shop,
+                  theme: themeId,
+                  assetId: id
+                });
+                if(removed) ++removedAssets;
+              } catch (e) {
+                console.log(e);
+              }
+    
+              if (removedAssets === installedAssets.length) {
+                const response = await app.locals.collection.findOne({
+                  shop: res.user.shop
+                });
+    
+                const installedThemeVersion =
+                  response["installedThemeVersion"] || {};
+                delete installedThemeVersion[themeId];
+    
+                const updated = await app.locals.collection.updateOne(
+                  { shop: res.user.shop },
+                  {
+                    $set: {
+                      installedThemeVersion: installedThemeVersion
+                    }
                   }
-                }
-              );
-              return cb(result);
-            }
-          }, 4000);
-        });
-      } else {
-        return cb();
-        console.log("Нет ресурсов для удаления");
-      }
+                );
+                return resolve(updated);
+              }
+            })
+          });
+        } else {
+          return resolve()
+          console.log("Нет ресурсов для удаления");
+        }
+      })
     }
 
     async function removeSnippetsIncludes() {
@@ -71,7 +81,7 @@ module.exports = function(app) {
         );
       }
       try {
-        inSalesApi.editAsset({
+        return await inSalesApi.editAsset({
           token: res.user.password,
           url: res.user.shop,
           theme: req.query["themeId"],
@@ -84,13 +94,6 @@ module.exports = function(app) {
         console.log(e);
       }
     }
-    /**
-     * Remove snippets includes from layouts.layout.liquid
-     */
-    await removeSnippetsIncludes();
-    return removeThemeAssets(() => {
-     return
-    });
   };
 
   const getInstalledAssets = (assets, exclude = []) => {

@@ -44,4 +44,6 @@ const inSalesApi = insales({
   secret: process.env.APP_SECRET
 });
 
-module.exports = { getPassword, checkAuth, inSalesApi, throttle };
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+module.exports = { getPassword, checkAuth, inSalesApi, throttle, delay };
