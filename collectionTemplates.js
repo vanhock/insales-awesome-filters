@@ -18,4 +18,19 @@ module.exports = [
     folder: "aromat",
     image: "aromat.png"
   },
+  {
+    name: "Cross",
+    folder: "cross",
+    image: "cross.jpg"
+  },
+  {
+    name: "Фантазия 2.0",
+    folder: "fantasy",
+    image: "fantasy.jpg"
+  },
+  {
+    name: "InstaShop",
+    folder: "instashop",
+    image: "instashop.jpg"
+  }
 ];

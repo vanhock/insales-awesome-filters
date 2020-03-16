@@ -17,10 +17,6 @@ module.exports = [
     type: "Asset::Media"
   },
   {
-    src: "af_chunk-vendors.css",
-    type: "Asset::Media"
-  },
-  {
     src: "af_assets_top.liquid",
     type: "Asset::Snippet"
   },

@@ -45,15 +45,13 @@ module.exports = function(app) {
         url: res.user.shop
       });
       res.send(
-        data
-          .filter(theme => !theme["is_published"])
-          .map(theme => ({
-            ...theme,
-            installed:
-              (!!res.user["installedThemeVersion"] &&
-                res.user["installedThemeVersion"][theme.id]) ||
-              false
-          }))
+        data.filter(theme => !theme["is_published"]).map(theme => ({
+          ...theme,
+          installed:
+            (!!res.user["installedThemeVersion"] &&
+              res.user["installedThemeVersion"][theme.id]) ||
+            false
+        }))
       );
     } catch (e) {
       console.log(e);
@@ -89,7 +87,10 @@ module.exports = function(app) {
         res.user["installedThemeVersion"][themeId]) ||
       0;
     const installedAssetsList = await getThemeAssets(req, res);
-    let installedAssets = getInstalledAssets(installedAssetsList, ["js", "css"]);
+    let installedAssets = getInstalledAssets(installedAssetsList, [
+      "js",
+      "css"
+    ]);
 
     if (
       cdn.data.version === thisInstalledThemeVersion &&
@@ -152,10 +153,10 @@ module.exports = function(app) {
         replace = true;
       }
 
-      if (replace/* wait while collection template updated or not */) {
+      if (replace /* wait while collection template updated or not */) {
         const success = [];
 
-        assets.forEach(async asset => {
+        assets.forEach(asset => {
           setTimeout(async () => {
             /**
              * Update .js, .css resources
@@ -165,17 +166,18 @@ module.exports = function(app) {
               asset.src.includes(".css")
             ) {
               const { data } = await updateAsset(asset.src, assetsForUpdate);
-              if(!data) {
+              if (!data) {
                 await uploadAssetToTheme(asset);
               } else {
-                result.report[data && data.inner_file_name || asset.src] = "ok";
-                success.push(data && data.inner_file_name || asset.src);
+                result.report[(data && data.inner_file_name) || asset.src] =
+                  "ok";
+                success.push((data && data.inner_file_name) || asset.src);
               }
             } else {
               /**
                * Upload other resources
                **/
-              await uploadAssetToTheme(asset)
+              await uploadAssetToTheme(asset);
             }
 
             if (success.length === assets.length) {
@@ -198,7 +200,6 @@ module.exports = function(app) {
               );
               return res.status(200).send(result);
             }
-            
           }, 1000);
         });
 
@@ -228,7 +229,7 @@ module.exports = function(app) {
             }
           }
         }
-  
+
         async function updateAsset(name, assetsForUpdate) {
           const asset = assetsForUpdate.filter(
             a => a["inner_file_name"] === name
@@ -293,7 +294,9 @@ module.exports = function(app) {
       let newCollection;
       try {
         newCollection = await axios.get(
-          `${assetBaseUrl}@${cdn.data.version}/dist/template/${folder}/collection.liquid`
+          `${assetBaseUrl}@${
+            cdn.data.version
+          }/dist/template/${folder}/collection.liquid`
         );
       } catch (e) {
         console.log(e);
