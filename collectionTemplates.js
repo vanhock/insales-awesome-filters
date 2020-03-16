@@ -32,5 +32,10 @@ module.exports = [
     name: "InstaShop",
     folder: "instashop",
     image: "instashop.jpg"
+  },
+  {
+    name: "Пленэр",
+    folder: "planner",
+    image: "planner.png"
   }
 ];
