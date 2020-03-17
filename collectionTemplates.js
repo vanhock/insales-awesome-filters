@@ -42,5 +42,15 @@ module.exports = [
     name: "Стиль",
     folder: "style",
     image: "style.jpg"
+  },
+  {
+    name: "Simple",
+    folder: "simple",
+    image: "simple.jpg"
+  },
+  {
+    name: "Нейрон 2.0",
+    folder: "neuron",
+    image: "neuron.png"
   }
 ];
