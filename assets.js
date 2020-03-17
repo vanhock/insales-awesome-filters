@@ -39,5 +39,9 @@ module.exports = [
   {
     src: "af_json_filters_option.liquid",
     type: "Asset::Snippet"
+  },
+  {
+    src: "af_json_filters_sorting.liquid",
+    type: "Asset::Snippet"
   }
 ];
