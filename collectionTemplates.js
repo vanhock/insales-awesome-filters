@@ -35,7 +35,12 @@ module.exports = [
   },
   {
     name: "Пленэр",
-    folder: "planner",
+    folder: "planer",
     image: "planner.png"
+  },
+  {
+    name: "Стиль",
+    folder: "style",
+    image: "style.jpg"
   }
 ];
