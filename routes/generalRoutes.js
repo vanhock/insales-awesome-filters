@@ -22,12 +22,10 @@ module.exports = function(app) {
         res.sendFile(path.join(__basedir + "/admin/dist/index.html"));
         return app.use(express.static(path.join(__basedir, "admin/dist/")));
       })
-      .catch(() => {
+      .catch(error => {
         return res
           .status(401)
-          .send(
-            "Авторизуйтесь в бек-офисе вашего сайта для входа в приложение"
-          );
+          .send(error);
       });
   });
 
