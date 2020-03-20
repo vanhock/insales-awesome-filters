@@ -1,7 +1,7 @@
 const axios = require("axios");
 const express = require("express");
 const path = require("path");
-const { checkAuth, inSalesApi, throttle } = require("../helpers");
+const { checkAuth, inSalesApi, filterObject } = require("../helpers");
 
 const withAuth = require("../middleware");
 
@@ -23,14 +23,15 @@ module.exports = function(app) {
         return app.use(express.static(path.join(__basedir, "admin/dist/")));
       })
       .catch(error => {
-        return res
-          .status(401)
-          .send(error);
+        return res.status(401).send(error);
       });
   });
 
   app.get("/get-user", withAuth, (req, res) => {
-    if (res.user) return res.status(200).send(res.user);
+    if (res.user)
+      return res
+        .status(200)
+        .send(filterObject(res.user, ["shop", "installedThemeVersion"]));
     res
       .status(401)
       .send("Авторизуйтесь в бек-офисе вашего сайта для входа в приложение");

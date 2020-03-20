@@ -50,7 +50,14 @@ module.exports = [
   },
   {
     name: "Нейрон 2.0",
-    folder: "neuron",
+    folder: "neuron2",
     image: "neuron.png"
+  },
+  {
+    name: "Нейрон 1.0",
+    folder: "neuron",
+    image: "neuron1.jpg"
   }
+
+
 ];

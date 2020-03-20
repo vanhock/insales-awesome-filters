@@ -8,7 +8,8 @@ const getPassword = function(token) {
 };
 
 const checkAuth = function(app, token) {
-  const errorMessage = "Ошибка авторизации. Пожалуйста, зайдите в приложение AwesomeFilters через бек-офис вашего сайта";
+  const errorMessage =
+    "Ошибка авторизации. Пожалуйста, зайдите в приложение AwesomeFilters через бек-офис вашего сайта";
   return new Promise((resolve, reject) => {
     app.locals.collection
       .findOne({
@@ -38,6 +39,18 @@ const throttle = function(func, wait = 100) {
   };
 };
 
+const filterObject = function(object, includes, except) {
+  return Object.keys(object)
+    .filter(
+      key =>
+        except && except.length ? !except.includes(key) : includes.includes(key)
+    )
+    .reduce((obj, key) => {
+      obj[key] = object[key];
+      return obj;
+    }, {});
+};
+
 const insales = require("insales");
 const inSalesApi = insales({
   id: process.env.APP_ID,
@@ -46,4 +59,11 @@ const inSalesApi = insales({
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = { getPassword, checkAuth, inSalesApi, throttle, delay };
+module.exports = {
+  getPassword,
+  checkAuth,
+  inSalesApi,
+  throttle,
+  delay,
+  filterObject
+};
