@@ -2,23 +2,23 @@ const { inSalesApi } = require("../helpers");
 module.exports = function(app) {
   const createBill = async (req, res) => {
     const appHost = req.get("host");
-    const billId = res.user.id;
+    const billId = `p${res.user.id}`;
     try {
-      const response = await inSalesApi.createCharge({
+      const {data} = await inSalesApi.createCharge({
         token: res.user.password,
         url: res.user.shop,
         charge: {
-          "application-charge": {
-            name: "Awesome Filters",
-            price: process.env.APP_PRICE || "2700.0",
-            test: process.env.APP_TEST_PAYMENT,
-            "return-url": `https://${appHost}/check_payment_url/p${billId}`
-          }
+          name: "Awesome Filters",
+          price: process.env.APP_PRICE || "2700.0",
+          test: process.env.APP_TEST_PAYMENT,
+          "return-url": `https://${appHost}/check_payment_url/${billId}`
         }
       });
-      const confirmationUrl =
-        response["application-charge"]["confirmation-url"];
-      const status = response["application-charge"]["status"];
+      if(!data) {
+        return Promise.reject("Payment failed");
+      }
+      const confirmationUrl = data["confirmation_url"];
+      const status = data["status"];
       await app.locals.collection.updateOne(
         { shop: res.user.shop },
         {
@@ -32,6 +32,7 @@ module.exports = function(app) {
       return res.redirect(confirmationUrl);
     } catch (e) {
       console.log(e);
+      return Promise.reject("Payment failed");
     }
   };
 
@@ -61,12 +62,11 @@ module.exports = function(app) {
       return;
     }
     try {
-      const response = await inSalesApi.getCharge({
+      const charge = await inSalesApi.getCharge({
         token: res.user.password,
         url: res.user.shop,
         chargeid: billId
       });
-      const charge = response["application-charge"];
       if (charge.status === "accepted") {
         await app.locals.collection.updateOne(
           { shop: res.user.shop },
@@ -78,7 +78,7 @@ module.exports = function(app) {
         );
         return res.redirect("/");
       } else {
-        return res.redirect(res.user.paymentConfirmationUrl)
+        return res.redirect(res.user.paymentConfirmationUrl);
       }
     } catch (e) {
       console.log(e);

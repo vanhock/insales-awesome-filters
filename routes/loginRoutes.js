@@ -43,7 +43,7 @@ module.exports = function(app) {
     }
   });
 
-  app.get("/autologin", (req, res) => {
+  app.get("/autologin", async (req, res) => {
     const {
       token3,
       user_email,
@@ -55,43 +55,40 @@ module.exports = function(app) {
       res.clearCookie("af_token");
       return res.redirect("/#/unauthorized");
     }
-    app.locals.collection.findOne({ user_id: user_id }).then(user => {
-      if (!user) {
-        res.clearCookie("af_token");
-        return res.redirect("/#/unauthorized");
-      }
-      const isAuthValid =
-        crypto
-          .createHash("md5")
-          .update(
-            user.auth_verify_token +
-              user_email +
-              user_name +
-              user_id +
-              email_confirmed +
-              user.password
-          )
-          .digest("hex") === token3;
-      if (isAuthValid) {
-        /** First of all, need to check app paid or not **/
-        checkPayment(req, res);
-        const af_token = crypto.randomBytes(20).toString("hex");
-        app.locals.collection
-          .findOneAndUpdate(
-            { user_id: user_id },
-            { $set: { af_token: af_token } }
-          )
-          .then(() => {
-            res.cookie("af_token", af_token, {
-              maxAge: 900000,
-              httpOnly: true
-            });
-            res.redirect("/");
-          });
-      } else {
-        res.clearCookie("af_token");
-        return res.redirect("/#/unauthorized");
-      }
-    });
+    const user = await app.locals.collection.findOne({ user_id: user_id });
+    if (!user) {
+      res.clearCookie("af_token");
+      return res.redirect("/#/unauthorized");
+    }
+    const isAuthValid =
+      crypto
+        .createHash("md5")
+        .update(
+          user.auth_verify_token +
+            user_email +
+            user_name +
+            user_id +
+            email_confirmed +
+            user.password
+        )
+        .digest("hex") === token3;
+    if (isAuthValid) {
+      res.user = user;
+      /** First of all, need to check app paid or not **/
+      await checkPayment(req, res);
+      const af_token = crypto.randomBytes(20).toString("hex");
+      await app.locals.collection.findOneAndUpdate(
+        { user_id: user_id },
+        { $set: { af_token: af_token } }
+      );
+      res.cookie("af_token", af_token, {
+        maxAge: 900000,
+        httpOnly: true
+      });
+      res.redirect("/");
+    } else {
+      res.clearCookie("af_token");
+      return res.redirect("/#/unauthorized");
+    }
   });
 };
