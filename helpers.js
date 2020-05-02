@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const getPassword = function(token) {
+const setPassword = function(token) {
   const data = token + process.env.APP_SECRET;
   return crypto
     .createHash("md5")
@@ -60,7 +60,7 @@ const inSalesApi = insales({
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
 module.exports = {
-  getPassword,
+  setPassword,
   checkAuth,
   inSalesApi,
   throttle,

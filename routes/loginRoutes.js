@@ -1,7 +1,8 @@
 const { checkAuth } = require("../helpers");
-
 const crypto = require("crypto");
 module.exports = function(app) {
+  const { checkPayment } = require("../controllers/billingController")(app);
+
   app.get("/login", (req, res) => {
     const { shop, user_id } = req.query;
     const appHost = req.get("host");
@@ -36,9 +37,7 @@ module.exports = function(app) {
           }
         )
         .then(() => {
-          const urlForRedirect = `https://${shop}/admin/applications/${
-            process.env.APP_ID
-          }/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
+          const urlForRedirect = `https://${shop}/admin/applications/${process.env.APP_ID}/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
           return res.redirect(urlForRedirect);
         });
     }
@@ -53,13 +52,13 @@ module.exports = function(app) {
       email_confirmed
     } = req.query;
     if (!token3) {
-      return res.status(500).send("Have no required params!");
+      res.clearCookie("af_token");
+      return res.redirect("/#/unauthorized");
     }
     app.locals.collection.findOne({ user_id: user_id }).then(user => {
       if (!user) {
-        return res
-          .status(400)
-          .send("Ошибка авторизации, переустановите приложение");
+        res.clearCookie("af_token");
+        return res.redirect("/#/unauthorized");
       }
       const isAuthValid =
         crypto
@@ -74,6 +73,8 @@ module.exports = function(app) {
           )
           .digest("hex") === token3;
       if (isAuthValid) {
+        /** First of all, need to check app paid or not **/
+        checkPayment(req, res);
         const af_token = crypto.randomBytes(20).toString("hex");
         app.locals.collection
           .findOneAndUpdate(
@@ -89,7 +90,7 @@ module.exports = function(app) {
           });
       } else {
         res.clearCookie("af_token");
-        res.status(400).send("Ошибка авторизации, переустановите приложение");
+        return res.redirect("/#/unauthorized");
       }
     });
   });

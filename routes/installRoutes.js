@@ -1,7 +1,10 @@
 const withAuth = require("../middleware");
-const { getPassword } = require("../helpers");
+const { setPassword } = require("../helpers");
 module.exports = function(app) {
-  const { uninstallFromTheme } = require("../controllers/themesController")(app);
+  const { uninstallFromTheme } = require("../controllers/themesController")(
+    app
+  );
+  const { removeBill } = require("../controllers/billingController")(app);
   app.get("/install", async (req, res) => {
     const { shop, token, insales_id } = req.query;
     if (!shop || !token || !insales_id) {
@@ -13,7 +16,7 @@ module.exports = function(app) {
         return restore();
       }
     } catch (e) {
-      console.log(e)
+      console.log(e);
     }
 
     install();
@@ -22,7 +25,7 @@ module.exports = function(app) {
       try {
         const { error } = await app.locals.collection.findOneAndUpdate(
           { shop: shop },
-          { $set: { password: getPassword(token), insales_id: insales_id } }
+          { $set: { password: setPassword(token), insales_id: insales_id } }
         );
         if (error) return console.log(error);
         return res.status(200).send("Ok!");
@@ -34,7 +37,7 @@ module.exports = function(app) {
       try {
         const { error } = await app.locals.collection.insertOne({
           shop: shop,
-          password: getPassword(token),
+          password: setPassword(token),
           insales_id: insales_id
         });
         if (error) return console.log(error);
@@ -46,7 +49,7 @@ module.exports = function(app) {
   });
 
   app.get("/uninstall", async (req, res) => {
-    const {shop, token, insales_id} = req.query;
+    const { shop, token, insales_id } = req.query;
     if (!shop || !token || !insales_id) {
       return res.status(400).send("Has no required params!");
     }
@@ -55,12 +58,17 @@ module.exports = function(app) {
       insales_id: insales_id,
       password: token
     });
-    if(!account) {
+    if (!account) {
       return res.status(401).send("Нет доступа для данной операции");
     }
+
+    /** Remove build if bill not paid **/
+    removeBill(req, res);
+
     res.user = account;
     const installedThemes = account.installedThemeVersion;
     const removedThemes = [];
+
     if (installedThemes && Object.keys(installedThemes).length) {
       for (let key in installedThemes) {
         if (installedThemes.hasOwnProperty(key)) {
@@ -68,14 +76,16 @@ module.exports = function(app) {
           try {
             const theme = await uninstallFromTheme(req, res);
             removedThemes.push(theme);
-            if(removedThemes.length === Object.keys(installedThemes).length) {
-              return removeFromDatabase()
+            if (removedThemes.length === Object.keys(installedThemes).length) {
+              return removeFromDatabase();
             }
           } catch (e) {
             console.log(e.message || e);
           }
         }
       }
+    } else {
+      return res.status(200);
     }
     async function removeFromDatabase() {
       try {
@@ -85,11 +95,11 @@ module.exports = function(app) {
           },
           {
             $unset: {
-              "installedThemeVersion": "",
-              "af_token": "",
-              "user_id": "",
-              "auth_verify_token": "",
-              "password": ""
+              installedThemeVersion: "",
+              af_token: "",
+              user_id: "",
+              auth_verify_token: "",
+              password: ""
             }
           }
         );
