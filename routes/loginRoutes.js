@@ -74,13 +74,20 @@ module.exports = function(app) {
         .digest("hex") === token3;
     if (isAuthValid) {
       res.user = user;
-      /** First of all, need to check app paid or not **/
-      await checkPayment(req, res);
       const af_token = crypto.randomBytes(20).toString("hex");
       await app.locals.collection.findOneAndUpdate(
-        { user_id: user_id },
-        { $set: { af_token: af_token } }
+          { user_id: user_id },
+          { $set: { af_token: af_token } }
       );
+      /** First of all, need to check app paid or not **/
+      try {
+        const redirectUrl = await checkPayment(req, res);
+        if (redirectUrl) {
+          return res.redirect(redirectUrl);
+        }
+      } catch (e) {
+        return res.redirect("/#/unauthorized");
+      }
       res.cookie("af_token", af_token, {
         maxAge: 900000,
         httpOnly: true
