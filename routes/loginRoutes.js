@@ -81,18 +81,21 @@ module.exports = function(app) {
       );
       /** First of all, need to check app paid or not **/
       try {
-        const redirectUrl = await checkPayment(req, res);
+        const { redirectUrl, status } = await checkPayment(req, res);
         if (redirectUrl) {
           return res.redirect(redirectUrl);
+        }
+        if (status === "accepted") {
+          res
+            .cookie("af_token", af_token, {
+              maxAge: 900000,
+              httpOnly: true
+            })
+            .redirect("/");
         }
       } catch (e) {
         return res.redirect("/#/unauthorized");
       }
-      res.cookie("af_token", af_token, {
-        maxAge: 900000,
-        httpOnly: true
-      });
-      res.redirect("/");
     } else {
       res.clearCookie("af_token");
       return res.redirect("/#/unauthorized");

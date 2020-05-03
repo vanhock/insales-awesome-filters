@@ -21,10 +21,11 @@ module.exports = function(app) {
   });
 
   app.get("/get-user", withAuth, (req, res) => {
-    if (res.user)
+    if (res.user) {
       return res
         .status(200)
         .send(filterObject(res.user, ["shop", "installedThemeVersion"]));
+    }
     res
       .status(401)
       .send("Авторизуйтесь в бек-офисе вашего сайта для входа в приложение");
@@ -37,13 +38,15 @@ module.exports = function(app) {
         url: res.user.shop
       });
       res.send(
-        data.filter(theme => !theme["is_published"]).map(theme => ({
-          ...theme,
-          installed:
-            (!!res.user["installedThemeVersion"] &&
-              res.user["installedThemeVersion"][theme.id]) ||
-            false
-        }))
+        data
+          .filter(theme => !theme["is_published"])
+          .map(theme => ({
+            ...theme,
+            installed:
+              (!!res.user["installedThemeVersion"] &&
+                res.user["installedThemeVersion"][theme.id]) ||
+              false
+          }))
       );
     } catch (e) {
       console.log(e);
@@ -286,9 +289,7 @@ module.exports = function(app) {
       let newCollection;
       try {
         newCollection = await axios.get(
-          `${assetBaseUrl}@${
-            cdn.data.version
-          }/dist/template/${folder}/collection.liquid`
+          `${assetBaseUrl}@${cdn.data.version}/dist/template/${folder}/collection.liquid`
         );
       } catch (e) {
         console.log(e);

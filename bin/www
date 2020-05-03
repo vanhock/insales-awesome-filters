@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-require("@google-cloud/debug-agent").start({
+/*require("@google-cloud/debug-agent").start({
   allowExpressions: true,
   capture: { maxFrames: 20, maxProperties: 100 }
-});
+});*/
 /**
  * Module dependencies.
  */

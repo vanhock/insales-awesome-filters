@@ -19,7 +19,7 @@ module.exports = function(app) {
       console.log(e);
     }
 
-    install();
+    await install();
 
     async function restore() {
       try {
@@ -84,12 +84,13 @@ module.exports = function(app) {
           }
         }
       }
-    } else {
-      return res.status(200);
     }
+    await removeFromDatabase();
+    res.clearCookie("af_token");
+    res.status(200).send("Приложение удалено!");
     async function removeFromDatabase() {
       try {
-        await app.locals.collection.findOneAndUpdate(
+        return await app.locals.collection.findOneAndUpdate(
           {
             shop: account.shop
           },
@@ -103,8 +104,6 @@ module.exports = function(app) {
             }
           }
         );
-        res.clearCookie("af_token");
-        res.status(200);
       } catch (e) {
         res.status(400).send("Что-то пошло не так");
       }

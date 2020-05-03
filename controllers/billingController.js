@@ -28,7 +28,10 @@ module.exports = function(app) {
           }
         }
       );
-      return confirmationUrl;
+      return {
+        status: status,
+        redirectUrl: confirmationUrl
+      };
     } catch (e) {
       console.log(e);
       return Promise.reject("Payment failed");
@@ -78,8 +81,16 @@ module.exports = function(app) {
     if (!billId || res.user.billId !== billId) {
       return res.redirect(`https://${res.user.shop}/admin2/applications/`);
     }
-    const urlForRedirect = await checkBillStatus(req, res);
-    if (urlForRedirect) return res.redirect(urlForRedirect);
+    const { redirectUrl, status } = await checkBillStatus(req, res);
+    if (redirectUrl) return res.redirect(redirectUrl);
+    if (status === "accepted") {
+      res
+        .cookie("af_token", res.user["af_token"], {
+          maxAge: 900000,
+          httpOnly: true
+        })
+        .redirect("/");
+    }
   };
 
   const checkPayment = async (req, res) => {
@@ -89,9 +100,15 @@ module.exports = function(app) {
     } else if (billStatus === "pending") {
       return checkBillStatus(req, res);
     } else if (billStatus === "accepted") {
-      // do nothing
+      return {
+        status: billStatus,
+        redirectUrl: undefined
+      };
     } else {
-      return `https://${res.user.shop}/admin2/applications/`;
+      return {
+        status: billStatus,
+        redirectUrl: `https://${res.user.shop}/admin2/applications/`
+      };
     }
   };
 
@@ -109,6 +126,10 @@ module.exports = function(app) {
         url: res.user.shop,
         chargeid: res.user.billId
       });
+      const result = {
+        status: data.status,
+        redirectUrl: undefined
+      };
       if (data.status) {
         await app.locals.collection.updateOne(
           { shop: res.user.shop },
@@ -120,17 +141,14 @@ module.exports = function(app) {
         );
       }
       if (data.status === "declined") {
-        return `https://${res.user.shop}/admin2/applications`;
+        result.redirectUrl = `https://${res.user.shop}/admin2/applications`;
       }
       if (data.status === "accepted") {
-        res.cookie("af_token", res.user["af_token"], {
-          maxAge: 900000,
-          httpOnly: true
-        });
-        return "/";
+        // do nothing
       } else {
-        return res.user.paymentConfirmationUrl;
+        result.redirectUrl = res.user.paymentConfirmationUrl;
       }
+      return result;
     } catch (e) {
       console.log(e);
     }
