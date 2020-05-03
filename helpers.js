@@ -7,24 +7,20 @@ const setPassword = function(token) {
     .digest("hex");
 };
 
-const checkAuth = function(app, token) {
+const checkAuth = async (app, token) => {
   const errorMessage =
     "Ошибка авторизации. Пожалуйста, зайдите в приложение AwesomeFilters через бек-офис вашего сайта";
-  return new Promise((resolve, reject) => {
-    app.locals.collection
-      .findOne({
-        af_token: token
-      })
-      .then(user => {
-        if (!user) {
-          return reject(errorMessage);
-        }
-        return resolve(user);
-      })
-      .catch(() => {
-        return reject(errorMessage);
-      });
-  });
+  try {
+    const user = await app.locals.collection.findOne({
+      af_token: token
+    });
+    if (!user) {
+      return Promise.reject(errorMessage);
+    }
+    return user;
+  } catch (e) {
+    return Promise.reject(errorMessage);
+  }
 };
 
 const throttle = function(func, wait = 100) {
@@ -41,9 +37,8 @@ const throttle = function(func, wait = 100) {
 
 const filterObject = function(object, includes, except) {
   return Object.keys(object)
-    .filter(
-      key =>
-        except && except.length ? !except.includes(key) : includes.includes(key)
+    .filter(key =>
+      except && except.length ? !except.includes(key) : includes.includes(key)
     )
     .reduce((obj, key) => {
       obj[key] = object[key];

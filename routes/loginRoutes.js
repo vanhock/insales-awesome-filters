@@ -3,29 +3,28 @@ const crypto = require("crypto");
 module.exports = function(app) {
   const { checkPayment } = require("../controllers/billingController")(app);
 
-  app.get("/login", (req, res) => {
+  app.get("/login", async (req, res) => {
     const { shop, user_id } = req.query;
     const appHost = req.get("host");
     const af_token = req.cookies["af_token"];
     if (!af_token) {
       return login();
     }
-    checkAuth(app, af_token)
-      .then(account => {
-        if (af_token === account.af_token) {
-          return res.redirect("/");
-        } else {
-          return login();
-        }
-      })
-      .catch(error => {
-        res.clearCookie("af_token");
-        return res.status(500).send(error);
-      });
-    function login() {
+    try {
+      const account = await checkAuth(app, af_token);
+      if (af_token === account.af_token) {
+        return res.redirect("/");
+      } else {
+        return login();
+      }
+    } catch (e) {
+      return res.redirect("/#/unauthorized");
+    }
+
+    async function login() {
       const authVerifyToken = crypto.randomBytes(20).toString("hex");
-      app.locals.collection
-        .findOneAndUpdate(
+      try {
+        await app.locals.collection.findOneAndUpdate(
           {
             shop: shop
           },
@@ -35,11 +34,12 @@ module.exports = function(app) {
               auth_verify_token: authVerifyToken
             }
           }
-        )
-        .then(() => {
-          const urlForRedirect = `https://${shop}/admin/applications/${process.env.APP_ID}/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
-          return res.redirect(urlForRedirect);
-        });
+        );
+        const urlForRedirect = `https://${shop}/admin/applications/${process.env.APP_ID}/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
+        return res.redirect(urlForRedirect);
+      } catch (e) {
+        console.log(e);
+      }
     }
   });
 
@@ -76,8 +76,8 @@ module.exports = function(app) {
       res.user = user;
       const af_token = crypto.randomBytes(20).toString("hex");
       await app.locals.collection.findOneAndUpdate(
-          { user_id: user_id },
-          { $set: { af_token: af_token } }
+        { user_id: user_id },
+        { $set: { af_token: af_token } }
       );
       /** First of all, need to check app paid or not **/
       try {
