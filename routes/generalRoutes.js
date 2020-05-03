@@ -15,16 +15,9 @@ module.exports = function(app) {
     getThemeAssets
   } = require("../controllers/themesController")(app);
 
-  app.get("/", (req, res) => {
-    const af_token = req.cookies["af_token"];
-    checkAuth(app, af_token)
-      .then(() => {
-        res.sendFile(path.join(__basedir + "/admin/dist/index.html"));
-        return app.use(express.static(path.join(__basedir, "admin/dist/")));
-      })
-      .catch(error => {
-        return res.status(401).send(error);
-      });
+  app.get("/", async (req, res) => {
+    res.sendFile(path.join(__basedir + "/admin/dist/index.html"));
+    return app.use(express.static(path.join(__basedir, "admin/dist/")));
   });
 
   app.get("/get-user", withAuth, (req, res) => {

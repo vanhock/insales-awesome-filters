@@ -78,21 +78,21 @@ module.exports = function(app) {
     if (!billId || res.user.billId !== billId) {
       return res.redirect(`https://${res.user.shop}/admin2/applications/`);
     }
-    return checkBillStatus(req, res);
+    const urlForRedirect = await checkBillStatus(req, res);
+    if (urlForRedirect) return res.redirect(urlForRedirect);
   };
 
   const checkPayment = async (req, res) => {
     const billStatus = res.user.billStatus;
     if (!billStatus || billStatus === "not_paid" || billStatus === "declined") {
       return await createBill(req, res);
-    }
-    if (billStatus === "pending") {
+    } else if (billStatus === "pending") {
       return checkBillStatus(req, res);
-    }
-    if (billStatus === "accepted") {
+    } else if (billStatus === "accepted") {
       // do nothing
+    } else {
+      return `https://${res.user.shop}/admin2/applications/`;
     }
-    return `https://${res.user.shop}/admin2/applications/`;
   };
 
   return {
@@ -120,16 +120,16 @@ module.exports = function(app) {
         );
       }
       if (data.status === "declined") {
-        return res.redirect(`https://${res.user.shop}/admin2/applications`);
+        return `https://${res.user.shop}/admin2/applications`;
       }
       if (data.status === "accepted") {
         res.cookie("af_token", res.user["af_token"], {
           maxAge: 900000,
           httpOnly: true
         });
-        return res.redirect("/");
+        return "/";
       } else {
-        return res.redirect(res.user.paymentConfirmationUrl);
+        return res.user.paymentConfirmationUrl;
       }
     } catch (e) {
       console.log(e);
