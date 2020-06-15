@@ -4,7 +4,7 @@ module.exports = function(app) {
   const { checkPayment } = require("../controllers/billingController")(app);
 
   app.get("/login", async (req, res) => {
-    const { shop, user_id } = req.query;
+    const { insales_id, shop, user_id } = req.query;
     const appHost = req.get("host");
     const af_token = req.cookies["af_token"];
     if (!af_token) {
@@ -24,9 +24,9 @@ module.exports = function(app) {
     async function login() {
       const authVerifyToken = crypto.randomBytes(20).toString("hex");
       try {
-        await app.locals.collection.findOneAndUpdate(
+        const response = await app.locals.collection.findOneAndUpdate(
           {
-            shop: shop
+            insales_id: insales_id
           },
           {
             $set: {
@@ -35,8 +35,10 @@ module.exports = function(app) {
             }
           }
         );
-        const urlForRedirect = `https://${shop}/admin/applications/${process.env.APP_ID}/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
-        return res.redirect(urlForRedirect);
+        if (response) {
+          const urlForRedirect = `https://${shop}/admin/applications/${process.env.APP_ID}/login?token=${authVerifyToken}&login=https://${appHost}/autologin`;
+          return res.redirect(urlForRedirect);
+        }
       } catch (e) {
         console.log(e);
       }
