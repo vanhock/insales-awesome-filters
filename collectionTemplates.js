@@ -9,6 +9,11 @@ module.exports = [
     image: "default.jpg"
   },
   {
+    name: "DotStore",
+    folder: "dotstore",
+    image: "dotstore.jpg"
+  },
+  {
     name: "Fleur",
     folder: "fleur",
     image: "fleur.jpg"
