@@ -11,7 +11,7 @@ module.exports = [
   {
     name: "DotStore",
     folder: "dotstore",
-    image: "dotstore.jpg"
+    image: "dotstore.png"
   },
   {
     name: "Fleur",
